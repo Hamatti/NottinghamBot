@@ -1,3 +1,8 @@
+"""
+  Basic IRCbot with irclib.py and BeautifulSoup
+"""
+
+
 import irclib
 import sys, os, signal
 import urllib, BeautifulSoup
@@ -13,6 +18,7 @@ port = 6667
 channel = '#nottingham'
 nick = 'RobinHoodi'
 name = 'New Sheriff of Nottingham'
+database = 'urls.db'
 
 # The owner and the admins
 owner = 'Hamatti'
@@ -67,8 +73,9 @@ def handlePubMsg(connection, event):
     map_to_database(new_title, message, user)
     server.privmsg(channel, new_title)
 
+# Logs all the urls (ones starting with http(s) posted to channel to a sqlite3 database 
 def map_to_database(title, url, user):
-  conn = sql.connect('urls.db')
+  conn = sql.connect(database)
   c = conn.cursor()
   day = date.today()
   t = (title, url, user, day)
@@ -99,36 +106,21 @@ def handleCommands(event, message):
   elif command == 'admins':
     server.privmsg(channel, 'Admins of the bot are: ' + str(admins))
   
-  # Food
-  elif command == 'ruoka':
-    assari = fetchFood()
-    server.privmsg(channel , assari + ' | http://murkinat.appspot.com')
-
   # Unknown command
   else:
     server.privmsg(channel, 'Unknown command or insufficient parameters')
   
-  
+# Handling private messages
 def handlePrivMsg(connection, event):
-  name = event.source().split('!')[0] 
-  message = event.arguments()[0]
-  if name == owner and message == 'quit':
-    quit()
-  if name == owner and message == 'boot':
-    restart()
+ # name = event.source().split('!')[0] 
+ # message = event.arguments()[0]
+  pass
 
 def handleNewNick(connection, event):
   nick = server.get_nickname() + '_'
 
-def quit():
-  server.disconnect('I love you, but I got to go <3')
-  sys.exit()
 
-def restart():
-  python = sys.executable
-  os.execl(python, python, *sys.argv)   
-
-# Fetch titles from url
+# Fetch titles from url using BeautifulSoup
 def fetchTitle(url):
   global title
   def timeout_handler(signum, frame):
