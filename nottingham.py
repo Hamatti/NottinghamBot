@@ -19,10 +19,13 @@ channel = '#nottingham'
 nick = 'RobinHoodi'
 name = 'New Sheriff of Nottingham'
 database = 'urls.db'
+adminsFile = 'admins.txt'
 
 # The owner and the admins
 owner = 'Hamatti'
-admins = ['vianah', 'alpeha', 'jumasan', 'jmaoja', 'jopemi', 'pesape', 'aatkin', 'anttlai']
+admins = []
+for line in open(adminsFile, "r"):
+  admins.append(line.strip())
 
 # Create an IRC object from irclib
 irc = irclib.IRC()
