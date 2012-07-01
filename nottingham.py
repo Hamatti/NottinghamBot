@@ -24,8 +24,6 @@ adminsFile = 'admins.txt'
 # The owner and the admins
 owner = 'Hamatti'
 admins = []
-for line in open(adminsFile, "r"):
-  admins.append(line.strip())
 
 # Create an IRC object from irclib
 irc = irclib.IRC()
@@ -142,6 +140,11 @@ def fetchTitle(url):
     pass    
 
 
+# Read admins to list
+def readAdmins():
+  for line in open(adminsFile, "r"):
+    admins.append(line.strip())
+
 # Register handlers
 irc.add_global_handler ( 'privnotice', handlePrivNotice ) #Private notice
 irc.add_global_handler ( 'welcome', handleEcho ) # Welcome message
@@ -174,4 +177,5 @@ server.join(channel)
 
 
 # Infinite loop
+readAdmins()
 irc.process_forever()
