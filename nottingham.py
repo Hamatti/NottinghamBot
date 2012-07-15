@@ -1,13 +1,13 @@
-"""
-  Basic IRCbot with irclib.py and BeautifulSoup
-"""
+# -*- coding: utf-8 -*- 
 
-
-import irclib
-import sys, os, signal
-import urllib, BeautifulSoup
+import irclib, mwclient, lxml, pywapi
+import sys, os, signal, mimetypes, types, random
+import urllib, urllib2
+import string
+from bs4 import BeautifulSoup
 import sqlite3 as sql
 from datetime import date
+from mechanize import Browser
 
 # For debugging and learning. Comment out if not needed
 irclib.DEBUG = True
@@ -18,12 +18,10 @@ port = 6667
 channel = '#nottingham'
 nick = 'RobinHoodi'
 name = 'New Sheriff of Nottingham'
-database = 'urls.db'
-adminsFile = 'admins.txt'
 
 # The owner and the admins
 owner = 'Hamatti'
-admins = []
+admins = ['vianah', 'alpeha', 'jumasan', 'jmaoja', 'jopemi', 'pesape', 'aatkin', 'anttlai']
 
 # Create an IRC object from irclib
 irc = irclib.IRC()
@@ -60,23 +58,43 @@ def handlePubMsg(connection, event):
   name = event.source().split('!')[0]
   message = event.arguments()[0]
   source = event.target()
-  
-  if 'http://' in message.lower():
-    message = 'http:' + message.split('http:')[1]
-    message = message.split(' ')[0] 
-    new_title = fetchTitle(message)
-    map_to_database(new_title, message, user)
-    server.privmsg(channel, new_title)
-  elif 'https://' in message.lower():
-    message = 'https:' + message.split('https:')[1]
-    message = message.split(' ')[0] 
-    new_title = fetchTitle(message)
-    map_to_database(new_title, message, user)
-    server.privmsg(channel, new_title)
+  try:
+    if 'http://' in message.lower():
+      message = 'http:' + message.split('http:')[1]
+      message = message.split(' ')[0] 
+      new_title = fetchTitle(message)
+    #map_to_database(new_title, message, user)
+      server.privmsg(channel, new_title)
+    elif 'https://' in message.lower():
+      message = 'https:' + message.split('https:')[1]
+      message = message.split(' ')[0] 
+      new_title = fetchTitle(message)
+    #map_to_database(new_title, message, user)
+      server.privmsg(channel, new_title)
+    elif '!poem' in message.lower():
+      server.privmsg(channel, fetchPoemLines())
+    elif message.lower().startswith("!what"):
+      query = message.split(' ')[1:]
+      query = " ".join(query)
+      server.privmsg(channel, readWikipedia(query).encode('utf-8'))
+    elif message.lower().startswith("!food"):
+      if len(message.split(' ')) < 2:
+        server.privmsg(channel, "Usage: !food [restaurant] . Restaurants at the moment are: ict, tottisalmi, assari, mikro, delica")
+      else:
+        restaurant = message.split(' ')[1]
+        server.privmsg(channel, fetchFood(restaurant).encode('utf-8'))
+    elif message.lower().startswith("!weather"):
+      if len(message.split(' ')) < 2:
+        server.privmsg(channel, "Usage: !weather [city]. Only Finnish cities.")
+      else:
+        city = message.split(' ')[1]
+        server.privmsg(channel, weather(city))
+                      
+  except:
+    server.privmsg(channel, "Error at level 3")
 
-# Logs all the urls (ones starting with http(s) posted to channel to a sqlite3 database 
 def map_to_database(title, url, user):
-  conn = sql.connect(database)
+  conn = sql.connect('urls.db')
   c = conn.cursor()
   day = date.today()
   t = (title, url, user, day)
@@ -102,48 +120,138 @@ def handleCommands(event, message):
           server.mode(channel, '-o ' + param1)
 	else:
 	  server.privmsg(channel, 'You cannot deop bot or Hamatti')
-	  
-  # Admins
-  elif command == 'admins':
-    server.privmsg(channel, 'Admins of the bot are: ' + str(admins))
   
-  # Unknown command
-  else:
-    server.privmsg(channel, 'Unknown command or insufficient parameters')
   
-# Handling private messages
 def handlePrivMsg(connection, event):
- # name = event.source().split('!')[0] 
- # message = event.arguments()[0]
-  pass
+  name = event.source().split('!')[0] 
+  message = event.arguments()[0]
+  if name == owner and message == 'quit':
+    quit()
+  if name == owner and message == 'boot':
+    restart()
 
 def handleNewNick(connection, event):
   nick = server.get_nickname() + '_'
 
+def quit():
+  server.disconnect('I love you, but I got to go <3')
+  sys.exit()
 
-# Fetch titles from url using BeautifulSoup
+def restart():
+  python = sys.executable
+  os.execl(python, python, *sys.argv)   
+
+# Fetch titles from url
 def fetchTitle(url):
+  br = Browser()
   global title
   def timeout_handler(signum, frame):
     pass
-
+  
   old_handler = signal.signal(signal.SIGALRM, timeout_handler)
   signal.alarm(6)
 
   try:
-    data = BeautifulSoup.BeautifulSoup(urllib.urlopen(url)) 
-    title = str(data.find('title')).split('>')[1].split('<')[0].strip()
-    signal.alarm(0)
-    return title    
+
+    mime = mimetypes.guess_type(url)
+    if type(mime[0]) == types.NoneType:
+      mimetype = "None"
+      fileExt = "None"
+    else:
+      mimetype, fileExt = mime[0].split("/")
+
+    if mimetype.lower() == 'image':
+      title = "Image."
+      signal.alarm(0)
+    elif mimetype.lower() == 'application':
+      title = "App. Doc. Something."
+      signal.alarm(0)
+    else:
+      res = br.open(url)
+      data = res.get_data()
+      soup = BeautifulSoup(data)
+    
+      raw_title = soup.find("title")
+      title = raw_title.renderContents().replace('\n','')
+      title = " ".join(title.split())
+      signal.alarm(0)
+
+    return title
 
   except:
-    pass    
+    title = "Not found."
+    signal.alarm(0)
+    return title
 
+def fetchPoemLines():
+    randPoem = random.randint(0,len(poems)-1)
+    poem = poems[randPoem]
+    rand = random.randint(0,len(poem)-3)
+    poemstring = "%s %s %s" % (poem[rand], poem[rand+1], poem[rand+2])
+    if poemstring.endswith(","):
+      poemstring = poemstring[:-1]
+    return poemstring
 
-# Read admins to list
-def readAdmins():
-  for line in open(adminsFile, "r"):
-    admins.append(line.strip())
+def readPoems():
+  global poems
+  poems = []
+  for filename in open('poems.txt'):
+    poemlines = []
+    for line in open(filename.strip()):
+      poemlines.append(line.strip())
+    poems.append(poemlines)
+
+def readWikipedia(query):
+    try:
+
+        site = mwclient.Site("en.wikipedia.org")
+        page = site.Pages[query]
+        if page.exists:
+            article = urllib.quote(query)
+            opener = urllib2.build_opener()
+            opener.addheaders = [('User-agent', 'Mozilla/5.0')] #wikipedia needs this                                                                                                                          
+
+            resource = opener.open("http://en.wikipedia.org/wiki/" + article)
+            url = "http://en.wikipedia.org/wiki/%s" % article
+            data = resource.read()
+            resource.close()
+            soup = BeautifulSoup(data)
+            paragraph = soup.find('div',id="bodyContent").p.get_text().replace('\n', '')
+            return  "%s @ %s" % (paragraph, url)
+
+        else:
+            return "Page not found."
+
+    except:
+        return "Error at level 4: %s" % sys.exc_info()[0]
+
+def fetchFood(restaurant):
+  
+  restaurants = {'assari': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGMG4Agw', 'delica': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGPnPAgw', 'ict': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGPnMAww', 'mikro': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGOqBAgw', 'tottisalmi': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGMK7AQw'}
+  if restaurants.has_key(restaurant.lower()):
+    opener = urllib2.build_opener()    
+    resource = opener.open("http://murkinat.appspot.com")
+    data = resource.read()
+    resource.close()
+    soup = BeautifulSoup(data, "lxml")
+    meal_div = soup.find(id="%s"%restaurants[restaurant.lower()])        
+    meal_div = meal_div.find_all("td", "mealName hyphenate")
+    mealstring = "%s: " % restaurant
+    for meal in meal_div:
+      mealstring += "%s / " % meal.string.strip()
+    mealstring = "%s @ %s" % (mealstring[:-3], "http://murkinat.appspot.com")
+    return mealstring
+
+  else:
+    return "Tuntematon ravintola"
+
+def weather(city):
+  try:
+    weather = pywapi.get_weather_from_google("%s finland" % city)
+    return "%s: %s and %s C now" % (city, string.lower(weather['current_conditions']['condition']), weather['current_conditions']['temp_c'])
+  except:
+    return "Unknown city"
+
 
 # Register handlers
 irc.add_global_handler ( 'privnotice', handlePrivNotice ) #Private notice
@@ -177,5 +285,5 @@ server.join(channel)
 
 
 # Infinite loop
-readAdmins()
+readPoems()
 irc.process_forever()
