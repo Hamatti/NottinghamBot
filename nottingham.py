@@ -13,10 +13,10 @@ from mechanize import Browser
 irclib.DEBUG = True
 
 # Connection information
-network = 'irc.cc.tut.fi'
+network = 'irc.in.tum.de'
 port = 6667
 channel = '#nottingham'
-nick = 'RobinHoodi'
+nick = 'RobinHoodie'
 name = 'New Sheriff of Nottingham'
 
 # The owner and the admins
@@ -63,13 +63,13 @@ def handlePubMsg(connection, event):
       message = 'http:' + message.split('http:')[1]
       message = message.split(' ')[0] 
       new_title = fetchTitle(message)
-    #map_to_database(new_title, message, user)
+      map_to_database(new_title, message, user)
       server.privmsg(channel, new_title)
     elif 'https://' in message.lower():
       message = 'https:' + message.split('https:')[1]
       message = message.split(' ')[0] 
       new_title = fetchTitle(message)
-    #map_to_database(new_title, message, user)
+      map_to_database(new_title, message, user)
       server.privmsg(channel, new_title)
     elif '!poem' in message.lower():
       server.privmsg(channel, fetchPoemLines())
@@ -92,15 +92,6 @@ def handlePubMsg(connection, event):
                       
   except:
     server.privmsg(channel, "Error at level 3")
-
-def map_to_database(title, url, user):
-  conn = sql.connect('urls.db')
-  c = conn.cursor()
-  day = date.today()
-  t = (title, url, user, day)
-  c.execute("INSERT INTO urls VALUES ?, ?, ?, ?", t)
-  conn.commit()
-  c.close()
 
 def handleCommands(event, message):
   message = message[1:len(message)]
@@ -141,8 +132,24 @@ def restart():
   python = sys.executable
   os.execl(python, python, *sys.argv)   
 
-# Fetch titles from url
+
+def map_to_database(title, url, user):
+  """
+  Stores each url from channel to urls.db database
+  """
+  conn = sql.connect('urls.db')
+  c = conn.cursor()
+  day = date.today()
+  t = (title.encode('utf-8'), url.encode('utf-8'), user, day)
+  c.execute("INSERT INTO urls VALUES ?, ?, ?, ?", t)
+  conn.commit()
+  c.close()
+
 def fetchTitle(url):
+  """
+  Returns <title> of page in given url
+  If url contains images, documents or applications ('image' or 'application' content-type) prints corresponding text
+  """
   br = Browser()
   global title
   def timeout_handler(signum, frame):
@@ -170,7 +177,8 @@ def fetchTitle(url):
       res = br.open(url)
       data = res.get_data()
       soup = BeautifulSoup(data)
-    
+      # TODO:
+      # Test if soup.title works fine instead of find('title')
       raw_title = soup.find("title")
       title = raw_title.renderContents().replace('\n','')
       title = " ".join(title.split())
@@ -183,7 +191,11 @@ def fetchTitle(url):
     signal.alarm(0)
     return title
 
+
 def fetchPoemLines():
+  """
+  Reads random poem from global poems variable and then returns 3 lines from that poem
+  """
     randPoem = random.randint(0,len(poems)-1)
     poem = poems[randPoem]
     rand = random.randint(0,len(poem)-3)
@@ -193,6 +205,9 @@ def fetchPoemLines():
     return poemstring
 
 def readPoems():
+  """
+  Read poems present in poems.txt
+  """
   global poems
   poems = []
   for filename in open('poems.txt'):
@@ -202,6 +217,10 @@ def readPoems():
     poems.append(poemlines)
 
 def readWikipedia(query):
+  """
+  Based on query, tries to find corresponding article from english or finnish wikipedia and then returns first paragraph and url to article.
+  Works fine on most articles but sometimes not since only takes account the first <p>-tag in page
+  """
     try:
 
         site = mwclient.Site("en.wikipedia.org")
@@ -226,7 +245,9 @@ def readWikipedia(query):
         return "Error at level 4: %s" % sys.exc_info()[0]
 
 def fetchFood(restaurant):
-  
+  """
+  Shows menu for student restaurants in Turku
+  """
   restaurants = {'assari': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGMG4Agw', 'delica': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGPnPAgw', 'ict': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGPnMAww', 'mikro': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGOqBAgw', 'tottisalmi': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGMK7AQw'}
   if restaurants.has_key(restaurant.lower()):
     opener = urllib2.build_opener()    
@@ -246,44 +267,51 @@ def fetchFood(restaurant):
     return "Tuntematon ravintola"
 
 def weather(city):
+  """
+  Return google weather for wanted city
+  """
   try:
     weather = pywapi.get_weather_from_google("%s finland" % city)
     return "%s: %s and %s C now" % (city, string.lower(weather['current_conditions']['condition']), weather['current_conditions']['temp_c'])
   except:
     return "Unknown city"
 
+def main():
+  # Register handlers
+  irc.add_global_handler ( 'privnotice', handlePrivNotice ) #Private notice
+  irc.add_global_handler ( 'welcome', handleEcho ) # Welcome message
+  irc.add_global_handler ( 'yourhost', handleEcho ) # Host message
+  irc.add_global_handler ( 'created', handleEcho ) # Server creation message
+  irc.add_global_handler ( 'myinfo', handleEcho ) # "My info" message
+  irc.add_global_handler ( 'featurelist', handleEcho ) # Server feature list
+  irc.add_global_handler ( 'luserclient', handleEcho ) # User count
+  irc.add_global_handler ( 'luserop', handleEcho ) # Operator count
+  irc.add_global_handler ( 'luserchannels', handleEcho ) # Channel count
+  irc.add_global_handler ( 'luserme', handleEcho ) # Server client count
+  irc.add_global_handler ( 'n_local', handleEcho ) # Server client count/maximum
+  irc.add_global_handler ( 'n_global', handleEcho ) # Network client count/maximum
+  irc.add_global_handler ( 'luserconns', handleEcho ) # Record client count
+  irc.add_global_handler ( 'luserunknown', handleEcho ) # Unknown connections
+  irc.add_global_handler ( 'motdstart', handleEcho ) # Message of the day ( start )
+  irc.add_global_handler ( 'motd', handleNoSpace ) # Message of the day
+  irc.add_global_handler ( 'edofmotd', handleEcho ) # Message of the day ( end )
+  irc.add_global_handler ( 'join', handleJoin ) # Channel join
+  irc.add_global_handler ( 'namreply', handleNoSpace ) # Channel name list
+  irc.add_global_handler ( 'endofnames', handleNoSpace ) # Channel name list ( end )
+  irc.add_global_handler ( 'pubmsg', handlePubMsg ) # Public messages
+  irc.add_global_handler ( 'privmsg', handlePrivMsg ) # Private messages
+  irc.add_global_handler ( 'nicknameinuse', handleNewNick ) # Gives new nickname if already used
 
-# Register handlers
-irc.add_global_handler ( 'privnotice', handlePrivNotice ) #Private notice
-irc.add_global_handler ( 'welcome', handleEcho ) # Welcome message
-irc.add_global_handler ( 'yourhost', handleEcho ) # Host message
-irc.add_global_handler ( 'created', handleEcho ) # Server creation message
-irc.add_global_handler ( 'myinfo', handleEcho ) # "My info" message
-irc.add_global_handler ( 'featurelist', handleEcho ) # Server feature list
-irc.add_global_handler ( 'luserclient', handleEcho ) # User count
-irc.add_global_handler ( 'luserop', handleEcho ) # Operator count
-irc.add_global_handler ( 'luserchannels', handleEcho ) # Channel count
-irc.add_global_handler ( 'luserme', handleEcho ) # Server client count
-irc.add_global_handler ( 'n_local', handleEcho ) # Server client count/maximum
-irc.add_global_handler ( 'n_global', handleEcho ) # Network client count/maximum
-irc.add_global_handler ( 'luserconns', handleEcho ) # Record client count
-irc.add_global_handler ( 'luserunknown', handleEcho ) # Unknown connections
-irc.add_global_handler ( 'motdstart', handleEcho ) # Message of the day ( start )
-irc.add_global_handler ( 'motd', handleNoSpace ) # Message of the day
-irc.add_global_handler ( 'edofmotd', handleEcho ) # Message of the day ( end )
-irc.add_global_handler ( 'join', handleJoin ) # Channel join
-irc.add_global_handler ( 'namreply', handleNoSpace ) # Channel name list
-irc.add_global_handler ( 'endofnames', handleNoSpace ) # Channel name list ( end )
-irc.add_global_handler ( 'pubmsg', handlePubMsg ) # Public messages
-irc.add_global_handler ( 'privmsg', handlePrivMsg ) # Private messages
-irc.add_global_handler ( 'nicknameinuse', handleNewNick ) # Gives new nickname if already used
+  # Create server object, connect and join
+  server.connect(network, port, nick, ircname = name)
+  server.join(channel)
+  
+  # Read poems to memory
+  readPoems()
 
-# Create server object, connect and join
-server.connect(network, port, nick, ircname = name)
-server.join(channel)
+  # Infinite loop
+  
+  irc.process_forever()
 
-
-
-# Infinite loop
-readPoems()
-irc.process_forever()
+if __name__ == '__main__':
+  main()
