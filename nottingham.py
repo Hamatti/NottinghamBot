@@ -90,7 +90,7 @@ def handlePubMsg(connection, event):
       else:
         restaurant = message.split(' ')[1]
         server.privmsg(channel, fetchFood(restaurant).encode('utf-8'))
-    elif message.lower().startswith("!weather"):
+    elif message.lower().startswith("!weather") or message.lower().startswith('!wt'):
       if len(message.split(' ')) < 2:
         server.privmsg(channel, "Usage: !weather [city]. Only Finnish cities.")
       else:
@@ -102,7 +102,12 @@ def handlePubMsg(connection, event):
       else:
         restaurant = message.split(' ')[1]
         server.privmsg(channel, openingTimes(restaurant).encode('utf-8'))
-                      
+    elif message.lower().startswith('!steam'):
+      if len(message.split(' ')) < 2:
+        server.privmsg(channel, 'Usage: !steam [game]. Experimental.')
+      else:
+        game = message.split(' ')[1:]
+        server.privmsg(channel, steamPrice(game).encode('utf-8'))
   except:
     server.privmsg(channel, "Error at level 3")
 
@@ -248,14 +253,30 @@ def readWikipedia(query):
       data = resource.read()
       resource.close()
       soup = BeautifulSoup(data)
-      paragraph = soup.find('div',id="bodyContent").p.get_text().replace('\n', '')
-      return  "%s @ %s" % (paragraph, url)
+      paragraph = soup.find('div',id="bodyContent").p.get_text()
     
+      return  "%s @ %s" % (paragraph, url)
     else:
-      return "Page not found."
+      site = mwclient.Site("fi.wikipedia.org")
+      page = site.Pages[query]
+      if page.exists:
+        article = urllib.quote(query)
+        opener = urllib2.build_opener()
+        opener.addheaders = [('User-agent', 'Mozilla/5.0')] #wikipedia needs this                                                                                                                      
+        
+        resource = opener.open("http://fi.wikipedia.org/wiki/" + article)
+        url = "http://fi.wikipedia.org/wiki/%s" % article
+        data = resource.read()
+        resource.close()
+        soup = BeautifulSoup(data)
+        paragraph = soup.find('div',id="bodyContent").p.get_text()
+        return  "%s @ %s" % (paragraph, url)
+            
+      else:
+        return "Page not found."
 
   except:
-    return "Error at level 4: %s" % sys.exc_info()[0]
+    return "Error at level 4 (Wikipedia)"
 
 def fetchFood(restaurant):
   """
@@ -311,6 +332,40 @@ def weather(city):
     return "%s: %s and %s C with %s %s" % (city, string.lower(weather['current_conditions']['condition']), weather['current_conditions']['temp_c'],weather['current_conditions']['humidity'],weather['current_conditions']['wind_condition'] )
   except:
     return "Unknown city"
+
+def steamPrice(game):
+  try:
+    search_url = 'http://store.steampowered.com/search/?term=%s&category1=998' % game.lower()
+    test_url = 'http://store.steampowered.com/app/47400/'
+    search_soup = BeautifulSoup(urllib.urlopen(search_url))
+    searched_apps = search_soup.find('a', 'search_result_row')
+
+    if isinstance(searched_apps, types.NoneType):
+        return "Game not found"
+    else:
+        search_url = searched_apps['href']
+
+    soup = BeautifulSoup(urllib.urlopen(search_url))
+    
+    try:
+      game_name = soup.find('div', 'details_block')
+      game_name = str(game_name).replace('\n', '').split(':')[1].split('>')[1].split('<')[0].strip()
+    except:
+      game_name = game
+
+    desc = soup.find('meta', attrs={'name': 'description'})
+    price_div = soup.find('div', 'game_purchase_price price')
+
+    if isinstance(price_div, types.NoneType):
+        price_div = soup.find('div', 'discount_final_price')
+
+    price = price_div.string
+    gamedesc = "%s: %s @ %s" % (game_name, str(desc).split('=')[1].split("\"")[1].decode('utf-8'), price.strip())
+
+    return gamedesc
+
+  except:
+    return "Game not found"
 
 def main():
   # Register handlers
