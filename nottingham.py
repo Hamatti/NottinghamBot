@@ -16,7 +16,7 @@ irclib.DEBUG = True
 network = 'irc.in.tum.de'
 port = 6667
 channel = '#nottingham'
-nick = 'RobinHoodi'
+nick = 'RobinHood'
 name = 'New Sheriff of Nottingham'
 
 # The owner and the admins
@@ -96,6 +96,12 @@ def handlePubMsg(connection, event):
       else:
         city = message.split(' ')[1]
         server.privmsg(channel, weather(city))
+    elif message.lower().startswith("!open"):
+      if len(message.split(' ')) < 2:
+        server.privmsg(channel, 'Usage: !open [restaurant]')
+      else:
+        restaurant = message.split(' ')[1]
+        server.privmsg(channel, openingTimes(restaurant).encode('utf-8'))
                       
   except:
     server.privmsg(channel, "Error at level 3")
@@ -279,6 +285,23 @@ def fetchFood(restaurant):
   else:
     return "Tuntematon ravintola"
 
+def openingTimes(restaurant):
+  restaurants = {'assari': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGMG4Agw', 'delica': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGPnPAgw', 'ict': 'restaurant_aghtdXJraW5hdHIa\
+CxISX1Jlc3RhdXJhbnRNb2RlbFYzGPnMAww', 'mikro': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGOqBAgw', 'tottisalmi': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGMK7AQw', 'tottis': 're\
+staurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGMK7AQw'}
+  if restaurants.has_key(restaurant.lower()):
+    soup = BeautifulSoup(urllib.urlopen("http://murkinat.appspot.com"))
+    rest_div = soup.find(id="%s" % restaurants[restaurant.lower()])
+    opening_table = rest_div.find('table', 'restaurantInfoOpeningTimes')
+    openings = "%s: " % restaurant
+    
+    dates_and_times = opening_table.find_all('tr')
+    for dat in dates_and_times:
+      openings += "%s %s, " % (dat.find('td', 'dayRange').string.strip(), dat.find('td', 'times').string.strip())
+    return openings[:-2]
+  else:
+    return "Tuntematon ravintola"
+    
 def weather(city):
   """
   Return google weather for wanted city
