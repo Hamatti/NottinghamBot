@@ -16,7 +16,7 @@ irclib.DEBUG = True
 network = 'irc.in.tum.de'
 port = 6667
 channel = '#nottingham'
-nick = 'RobinHoodie'
+nick = 'RobinHoodi'
 name = 'New Sheriff of Nottingham'
 
 # The owner and the admins
@@ -62,21 +62,28 @@ def handlePubMsg(connection, event):
     if 'http://' in message.lower():
       message = 'http:' + message.split('http:')[1]
       message = message.split(' ')[0] 
+      if message.endswith(')'):
+        message = message[:-1]
       new_title = fetchTitle(message)
-      map_to_database(new_title, message, user)
+      #map_to_database(new_title, message, user)
       server.privmsg(channel, new_title)
     elif 'https://' in message.lower():
       message = 'https:' + message.split('https:')[1]
       message = message.split(' ')[0] 
+      if message.endswith(')'):
+        message = message[:-1]
       new_title = fetchTitle(message)
-      map_to_database(new_title, message, user)
+      #map_to_database(new_title, message, user)
       server.privmsg(channel, new_title)
     elif '!poem' in message.lower():
       server.privmsg(channel, fetchPoemLines())
     elif message.lower().startswith("!what"):
-      query = message.split(' ')[1:]
-      query = " ".join(query)
-      server.privmsg(channel, readWikipedia(query).encode('utf-8'))
+      if len(message.split(' ')) < 2:
+        server.privmsg(channel, "Usage: !what [query]. English and Finnish Wikipedia.")
+      else:
+        query = message.split(' ')[1:]
+        query = " ".join(query)
+        server.privmsg(channel, readWikipedia(query).encode('utf-8'))
     elif message.lower().startswith("!food"):
       if len(message.split(' ')) < 2:
         server.privmsg(channel, "Usage: !food [restaurant] . Restaurants at the moment are: ict, tottisalmi, assari, mikro, delica")
@@ -196,14 +203,14 @@ def fetchPoemLines():
   """
   Reads random poem from global poems variable and then returns 3 lines from that poem
   """
-    randPoem = random.randint(0,len(poems)-1)
-    poem = poems[randPoem]
-    rand = random.randint(0,len(poem)-3)
-    poemstring = "%s %s %s" % (poem[rand], poem[rand+1], poem[rand+2])
-    if poemstring.endswith(","):
-      poemstring = poemstring[:-1]
-    return poemstring
-
+  randPoem = random.randint(0,len(poems)-1)
+  poem = poems[randPoem]
+  rand = random.randint(0,len(poem)-3)
+  poemstring = "%s %s %s" % (poem[rand], poem[rand+1], poem[rand+2])
+  if poemstring.endswith(","):
+    poemstring = poemstring[:-1]
+  return poemstring
+  
 def readPoems():
   """
   Read poems present in poems.txt
@@ -221,34 +228,35 @@ def readWikipedia(query):
   Based on query, tries to find corresponding article from english or finnish wikipedia and then returns first paragraph and url to article.
   Works fine on most articles but sometimes not since only takes account the first <p>-tag in page
   """
-    try:
+  try:
+    
+    site = mwclient.Site("en.wikipedia.org")
+    page = site.Pages[query]
+    if page.exists:
+      article = urllib.quote(query)
+      opener = urllib2.build_opener()
+      opener.addheaders = [('User-agent', 'Mozilla/5.0')] #wikipedia needs this                                                                                                                          
+      
+      resource = opener.open("http://en.wikipedia.org/wiki/" + article)
+      url = "http://en.wikipedia.org/wiki/%s" % article
+      data = resource.read()
+      resource.close()
+      soup = BeautifulSoup(data)
+      paragraph = soup.find('div',id="bodyContent").p.get_text().replace('\n', '')
+      return  "%s @ %s" % (paragraph, url)
+    
+    else:
+      return "Page not found."
 
-        site = mwclient.Site("en.wikipedia.org")
-        page = site.Pages[query]
-        if page.exists:
-            article = urllib.quote(query)
-            opener = urllib2.build_opener()
-            opener.addheaders = [('User-agent', 'Mozilla/5.0')] #wikipedia needs this                                                                                                                          
-
-            resource = opener.open("http://en.wikipedia.org/wiki/" + article)
-            url = "http://en.wikipedia.org/wiki/%s" % article
-            data = resource.read()
-            resource.close()
-            soup = BeautifulSoup(data)
-            paragraph = soup.find('div',id="bodyContent").p.get_text().replace('\n', '')
-            return  "%s @ %s" % (paragraph, url)
-
-        else:
-            return "Page not found."
-
-    except:
-        return "Error at level 4: %s" % sys.exc_info()[0]
+  except:
+    return "Error at level 4: %s" % sys.exc_info()[0]
 
 def fetchFood(restaurant):
   """
   Shows menu for student restaurants in Turku
   """
-  restaurants = {'assari': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGMG4Agw', 'delica': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGPnPAgw', 'ict': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGPnMAww', 'mikro': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGOqBAgw', 'tottisalmi': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGMK7AQw'}
+  restaurants = {'assari': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGMG4Agw', 'delica': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGPnPAgw', 'ict': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGPnMAww', 'mikro': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGOqBAgw', 'tottisalmi': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGMK7AQw', 'tottis': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGMK7AQw'}
+
   if restaurants.has_key(restaurant.lower()):
     opener = urllib2.build_opener()    
     resource = opener.open("http://murkinat.appspot.com")
@@ -256,12 +264,17 @@ def fetchFood(restaurant):
     resource.close()
     soup = BeautifulSoup(data, "lxml")
     meal_div = soup.find(id="%s"%restaurants[restaurant.lower()])        
-    meal_div = meal_div.find_all("td", "mealName hyphenate")
+    meal_trs = meal_div.find_all("tr", "meal")
+
+    meals = {}
+    for meal_tr in meal_trs:
+      meals[meal_tr.find('td', 'mealName hyphenate').string.strip()] = meal_tr.find('span', 'mealPrice').string.strip()
+
     mealstring = "%s: " % restaurant
-    for meal in meal_div:
-      mealstring += "%s / " % meal.string.strip()
-    mealstring = "%s @ %s" % (mealstring[:-3], "http://murkinat.appspot.com")
-    return mealstring
+    for meal in meals.keys():
+        mealstring += "%s: %s, " % (meal, meals[meal])
+    return "%s @ %s" % (mealstring[:-2], "http://murkinat.appspot.com")
+
 
   else:
     return "Tuntematon ravintola"
@@ -272,7 +285,7 @@ def weather(city):
   """
   try:
     weather = pywapi.get_weather_from_google("%s finland" % city)
-    return "%s: %s and %s C now" % (city, string.lower(weather['current_conditions']['condition']), weather['current_conditions']['temp_c'])
+    return "%s: %s and %s C with %s %s" % (city, string.lower(weather['current_conditions']['condition']), weather['current_conditions']['temp_c'],weather['current_conditions']['humidity'],weather['current_conditions']['wind_condition'] )
   except:
     return "Unknown city"
 
