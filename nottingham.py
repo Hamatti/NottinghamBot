@@ -337,7 +337,7 @@ def weather(city):
 
 def steamPrice(game):
   try:
-    search_url = 'http://store.steampowered.com/search/?term=%s' % game
+    search_url = 'http://store.steampowered.com/search/?term=%s&category1=998' % game
     test_url = 'http://store.steampowered.com/app/47400/'
     search_soup = BeautifulSoup(urllib.urlopen(search_url))
     searched_apps = search_soup.find('a', 'search_result_row')
