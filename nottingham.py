@@ -107,7 +107,9 @@ def handlePubMsg(connection, event):
         server.privmsg(channel, 'Usage: !steam [game]. Experimental.')
       else:
         game = message.split(' ')[1:]
-        server.privmsg(channel, steamPrice(game).encode('utf-8'))
+        gamedesc, gameurl = steamPrice(game)
+        server.privmsg(channel, gamedesc.encode('utf-8'))
+        server.privmsg(channel, gameurl.encode('utf-8'))
   except:
     server.privmsg(channel, "Error at level 3")
 
@@ -335,37 +337,30 @@ def weather(city):
 
 def steamPrice(game):
   try:
-    search_url = 'http://store.steampowered.com/search/?term=%s&category1=998' % game.lower()
+    search_url = 'http://store.steampowered.com/search/?term=%s' % game
     test_url = 'http://store.steampowered.com/app/47400/'
     search_soup = BeautifulSoup(urllib.urlopen(search_url))
     searched_apps = search_soup.find('a', 'search_result_row')
 
     if isinstance(searched_apps, types.NoneType):
-        return "Game not found"
+        return "Game not found", "http://store.steampowered.com"
     else:
         search_url = searched_apps['href']
 
     soup = BeautifulSoup(urllib.urlopen(search_url))
-    
-    try:
-      game_name = soup.find('div', 'details_block')
-      game_name = str(game_name).replace('\n', '').split(':')[1].split('>')[1].split('<')[0].strip()
-    except:
-      game_name = game
-
+    game_name = soup.find('div', 'details_block')
+    game_name = str(game_name).replace('\n', '').split(':')[1].split('>')[1].split('<')[0].strip()
     desc = soup.find('meta', attrs={'name': 'description'})
     price_div = soup.find('div', 'game_purchase_price price')
-
     if isinstance(price_div, types.NoneType):
         price_div = soup.find('div', 'discount_final_price')
-
     price = price_div.string
-    gamedesc = "%s: %s @ %s" % (game_name, str(desc).split('=')[1].split("\"")[1].decode('utf-8'), price.strip())
+    gamedesc = "%s: %s Cost: %s" % (game_name, str(desc).split('=')[1].split("\"")[1].decode('utf-8'), price.strip())
 
-    return gamedesc
+    return gamedesc, search_url
 
   except:
-    return "Game not found"
+    return "Error, game not found", "http://store.steampowered.com"
 
 def main():
   # Register handlers
