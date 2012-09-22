@@ -16,7 +16,7 @@ irclib.DEBUG = True
 network = 'irc.in.tum.de'
 port = 6667
 channel = '#nottingham'
-nick = 'RobinHood'
+nick = 'RobinHoodie'
 name = 'New Sheriff of Nottingham'
 
 # The owner and the admins
@@ -65,7 +65,7 @@ def handlePubMsg(connection, event):
       if message.endswith(')'):
         message = message[:-1]
       new_title = fetchTitle(message)
-      #map_to_database(new_title, message, user)
+#      map_to_database(new_title, message, user)
       server.privmsg(channel, new_title)
     elif 'https://' in message.lower():
       message = 'https:' + message.split('https:')[1]
@@ -73,7 +73,7 @@ def handlePubMsg(connection, event):
       if message.endswith(')'):
         message = message[:-1]
       new_title = fetchTitle(message)
-      #map_to_database(new_title, message, user)
+#      map_to_database(new_title, message, user)
       server.privmsg(channel, new_title)
     elif '!poem' in message.lower():
       server.privmsg(channel, fetchPoemLines())
@@ -110,6 +110,16 @@ def handlePubMsg(connection, event):
         gamedesc, gameurl = steamPrice(game)
         server.privmsg(channel, gamedesc.encode('utf-8'))
         server.privmsg(channel, gameurl.encode('utf-8'))
+    elif message.lower().startswith('!log'):
+      if user != 'jumasan':
+        pass
+      else:
+        conn = sql.connect('urls.db')
+        c = conn.cursor()
+        c.execute("INSERT INTO bookmarks SELECT * FROM urls ORDER BY rowid DESC LIMIT 1")
+        conn.commit()
+        c.close()
+        
   except:
     server.privmsg(channel, "Error at level 3")
 
@@ -160,7 +170,7 @@ def map_to_database(title, url, user):
   conn = sql.connect('urls.db')
   c = conn.cursor()
   day = date.today()
-  t = (title.encode('utf-8'), url.encode('utf-8'), user, day)
+  t = (title, url, user, day)
   c.execute("INSERT INTO urls VALUES ?, ?, ?, ?", t)
   conn.commit()
   c.close()
@@ -194,8 +204,11 @@ def fetchTitle(url):
       title = "App. Doc. Something."
       signal.alarm(0)
     else:
-      res = br.open(url)
-      data = res.get_data()
+      opener = urllib2.build_opener()
+      opener.addheaders = [('User-agent', 'Mozilla/5.0')] #For wikipedia
+      resource = opener.open(url)
+      data = resource.read()
+      resource.close()
       soup = BeautifulSoup(data)
       # TODO:
       # Test if soup.title works fine instead of find('title')
@@ -284,7 +297,7 @@ def fetchFood(restaurant):
   """
   Shows menu for student restaurants in Turku
   """
-  restaurants = {'assari': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGMG4Agw', 'delica': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGPnPAgw', 'ict': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGPnMAww', 'mikro': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGOqBAgw', 'tottisalmi': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGMK7AQw', 'tottis': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGMK7AQw'}
+  restaurants = {'assari': 'restaurant_ag5zfm11cmtpbmF0LWhyZHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGMG4Agw', 'delica': 'restaurant_ag5zfm11cmtpbmF0LWhyZHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGPnPAgw', 'ict': 'restaurant_ag5zfm11cmtpbmF0LWhyZHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGPnMAww', 'mikro': 'restaurant_ag5zfm11cmtpbmF0LWhyZHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGOqBAgw', 'tottisalmi': 'restaurant_ag5zfm11cmtpbmF0LWhyZHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGMK7AQw', 'tottis': 'restaurant_ag5zfm11cmtpbmF0LWhyZHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGMK7AQw'}
 
   if restaurants.has_key(restaurant.lower()):
     opener = urllib2.build_opener()    
