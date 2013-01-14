@@ -1,29 +1,48 @@
 # -*- coding: utf-8 -*- 
 
-import irclib, mwclient, lxml, pywapi
-import sys, os, signal, mimetypes, types, random
+# irclib-kirjasto tuo perustoiminnallisuudet irc-verkkoon liittymiseksi
+import irclib
+# mwclient Wikipedian parsimiseen, lxml BeautifulSoupin parsimisfunktioksi
+import mwclient, lxml
+# Järjestelmään liittyvät kirjastot
+import sys, os, signal
+# mimetypes sivustojen metadatan tulkitsemiseen (kuva, dokumentti, html-sivu), types-kirjasto NoneType-tarkistusta varten
+import mimetypes, types
+# random satunnaislukujen luomiseen
+import random
+# urllib-kirjastot verkkosivujen avaamiseen
 import urllib, urllib2
-import string
+# BeautifulSoup4-kirjasto web-sivujen DOMin parsimiseen
 from bs4 import BeautifulSoup
-import sqlite3 as sql
-from datetime import date
-from mechanize import Browser
+# konfiguraatiotiedostojen lukemiseen
+import ConfigParser
 
-# For debugging and learning. Comment out if not needed
-irclib.DEBUG = True
+from HTMLParser import HTMLParser
 
-# Connection information
-network = 'irc.in.tum.de'
-port = 6667
-channel = '#nottingham'
-nick = 'RobinHoodie'
-name = 'New Sheriff of Nottingham'
+class MLStripper(HTMLParser):
+    def __init__(self):
+        self.reset()
+        self.fed = []
+    def handle_data(self, d):
+        self.fed.append(d)
+    def get_data(self):
+        return ''.join(self.fed)
 
-# The owner and the admins
-owner = 'Hamatti'
-admins = ['vianah', 'alpeha', 'jumasan', 'jmaoja', 'jopemi', 'pesape', 'aatkin', 'anttlai']
+## Luetaan konfiguraatiotiedosto
+config = ConfigParser.RawConfigParser()
+config.read('config.conf')
 
-# Create an IRC object from irclib
+irclib.DEBUG = config.getboolean('Network', 'DEBUG')
+network = config.get('Network', 'network')
+port = config.getint('Network', 'port')
+channels = config.get('Network', 'channels').split(',')
+
+nick = config.get('Bot', 'nick')
+name = config.get('Bot', 'name')
+
+admins = config.get('Users', 'admins').split(',')
+
+# Luodaan irc-objekti ja serverimuuttuja irclib-kirjastosta
 irc = irclib.IRC()
 server = irc.server()
 
@@ -44,143 +63,98 @@ def handlePrivNotice(connection, event):
   else:
     print event.arguments()[0]
 
-# Handle channel joins
+# Käsittelee kanavalle liittyvät - tällä hetkellä opit saavat kaikki admins-listassa olevat kanavasta riippumatta
 def handleJoin(connection, event): 
   name = event.source().split('!')[0]
   user = event.source().split('!')[1].split('@')[0] 
   print name + ' has joined ' + event.target()
   if user in admins:
-    server.mode(channel, '+o ' + name)
-
-#Handle public messages
+    server.mode(event.target(), '+o ' + name)
+  
+# Perustoiminnallisuus kanavalle tulevien viestien (ja komentojen) käsittelyyn
 def handlePubMsg(connection, event):
   user = event.source().split('!')[1].split('@')[0]
   name = event.source().split('!')[0]
+  # Viesti, joka tulee kanavalle
   message = event.arguments()[0]
   source = event.target()
   try:
+    # linkkien käsittely
     if 'http://' in message.lower():
       message = 'http:' + message.split('http:')[1]
       message = message.split(' ')[0] 
       if message.endswith(')'):
         message = message[:-1]
       new_title = fetchTitle(message)
-#      map_to_database(new_title, message, user)
-      server.privmsg(channel, new_title)
+      server.privmsg(event.target(), new_title)
+
     elif 'https://' in message.lower():
       message = 'https:' + message.split('https:')[1]
       message = message.split(' ')[0] 
       if message.endswith(')'):
         message = message[:-1]
       new_title = fetchTitle(message)
-#      map_to_database(new_title, message, user)
-      server.privmsg(channel, new_title)
+      server.privmsg(event.target(), new_title)
+
+    # Botti lukee runoja
     elif '!poem' in message.lower():
-      server.privmsg(channel, fetchPoemLines())
+      server.privmsg(event.target(), fetchPoemLines())
+
+    # Wikipedia-haut
     elif message.lower().startswith("!what"):
       if len(message.split(' ')) < 2:
-        server.privmsg(channel, "Usage: !what [query]. English and Finnish Wikipedia.")
+        server.privmsg(event.target(), "Usage: !what [query]. English and Finnish Wikipedia.")
       else:
         query = message.split(' ')[1:]
         query = " ".join(query)
-        server.privmsg(channel, readWikipedia(query).encode('utf-8'))
+        server.privmsg(event.target(), readWikipedia(query).encode('utf-8'))
+
+    # Unican opiskelijaruokaloiden päivän tarjonta
     elif message.lower().startswith("!food"):
       if len(message.split(' ')) < 2:
-        server.privmsg(channel, "Usage: !food [restaurant] . Restaurants at the moment are: ict, tottisalmi, assari, mikro, delica")
+        server.privmsg(event.target(), "Usage: !food [restaurant] . Restaurants at the moment are: ict, tottisalmi, assari, mikro, delica")
       else:
         restaurant = message.split(' ')[1]
-        server.privmsg(channel, fetchFood(restaurant).encode('utf-8'))
-    elif message.lower().startswith("!weather") or message.lower().startswith('!wt'):
-      if len(message.split(' ')) < 2:
-        server.privmsg(channel, "Usage: !weather [city]. Only Finnish cities.")
-      else:
-        city = message.split(' ')[1]
-        server.privmsg(channel, weather(city))
-    elif message.lower().startswith("!open"):
-      if len(message.split(' ')) < 2:
-        server.privmsg(channel, 'Usage: !open [restaurant]')
-      else:
-        restaurant = message.split(' ')[1]
-        server.privmsg(channel, openingTimes(restaurant).encode('utf-8'))
+        server.privmsg(event.target(), fetchFood(restaurant).encode('utf-8'))
+
+    # Steam-pelipalvelun tietohaku
     elif message.lower().startswith('!steam'):
       if len(message.split(' ')) < 2:
-        server.privmsg(channel, 'Usage: !steam [game]. Experimental.')
+        server.privmsg(event.target(), 'Usage: !steam [game]. Experimental.')
       else:
         game = message.split(' ')[1:]
         gamedesc, gameurl = steamPrice(game)
-        server.privmsg(channel, gamedesc.encode('utf-8'))
-        server.privmsg(channel, gameurl.encode('utf-8'))
-    elif message.lower().startswith('!log'):
-      if user != 'jumasan':
-        pass
+        server.privmsg(event.target(), gamedesc.encode('utf-8'))
+        server.privmsg(event.target(), gameurl.encode('utf-8'))
+    # Päätöstyökalu
+    elif message.lower().startswith('!decide'):
+      if len(message.split(' ')) < 2:
+        server.privmsg(event.target(), 'Usage: !decide [option1] [option2] ... [optionN].')
       else:
-        conn = sql.connect('urls.db')
-        c = conn.cursor()
-        c.execute("INSERT INTO bookmarks SELECT * FROM urls ORDER BY rowid DESC LIMIT 1")
-        conn.commit()
-        c.close()
-        
+        choice = decide(message.split(' '))
+        server.privmsg(event.target(), '%s, noppa ratkaisee: %s' % (name, choice))
+    elif message.lower().startswith('!no'):
+      server.privmsg(event.target(), 'http://nooooooooooooooo.com/')
+       
   except:
-    server.privmsg(channel, "Error at level 3")
+    server.privmsg(event.target(), "Error at level 3")
 
-def handleCommands(event, message):
-  message = message[1:len(message)]
-  channel = event.target()
-  command = message.split(' ')[0]
-  
-  # op or deop
-  if command == 'op' or command == 'deop':
-    param1 = message.split(' ')[1]	  
-    if len(message.split(' ')) < 2:
-      server.privmsg(channel, 'Not enough parameters')
-    else:
-      if command == 'op':
-        server.mode(channel, '+o ' + param1)
-      else:
-	if param1 != 'Hamatti' and param1 != nick:
-          server.mode(channel, '-o ' + param1)
-	else:
-	  server.privmsg(channel, 'You cannot deop bot or Hamatti')
-  
-  
+# Käsitteli yksityisviestit - ei toiminnallisuuksia tällä hetkellä
 def handlePrivMsg(connection, event):
-  name = event.source().split('!')[0] 
-  message = event.arguments()[0]
-  if name == owner and message == 'quit':
-    quit()
-  if name == owner and message == 'boot':
-    restart()
+  pass
 
+# Nickin vaihtaminen
 def handleNewNick(connection, event):
   nick = server.get_nickname() + '_'
 
-def quit():
-  server.disconnect('I love you, but I got to go <3')
-  sys.exit()
+## Varsinaiset lisätoiminnallisuudet ##
 
-def restart():
-  python = sys.executable
-  os.execl(python, python, *sys.argv)   
-
-
-def map_to_database(title, url, user):
-  """
-  Stores each url from channel to urls.db database
-  """
-  conn = sql.connect('urls.db')
-  c = conn.cursor()
-  day = date.today()
-  t = (title, url, user, day)
-  c.execute("INSERT INTO urls VALUES ?, ?, ?, ?", t)
-  conn.commit()
-  c.close()
-
+# Hakee annetulle urlille otsikon (<title>-tagin sisällön) tai kertoo mitä tyyppiä se on
 def fetchTitle(url):
   """
   Returns <title> of page in given url
   If url contains images, documents or applications ('image' or 'application' content-type) prints corresponding text
   """
-  br = Browser()
   global title
   def timeout_handler(signum, frame):
     pass
@@ -204,15 +178,17 @@ def fetchTitle(url):
       title = "App. Doc. Something."
       signal.alarm(0)
     else:
+      # Avataan url
       opener = urllib2.build_opener()
-      opener.addheaders = [('User-agent', 'Mozilla/5.0')] #For wikipedia
+      opener.addheaders = [('User-agent', 'Mozilla/5.0')] 
       resource = opener.open(url)
       data = resource.read()
       resource.close()
+      # Luetaan data BeutifulSoup-olioon
       soup = BeautifulSoup(data)
-      # TODO:
-      # Test if soup.title works fine instead of find('title')
+      # Haetaan sivun <title>-tagin sisältö
       raw_title = soup.find("title")
+      # Poistetaan mahdolliset rivinvaihdot
       title = raw_title.renderContents().replace('\n','')
       title = " ".join(title.split())
       signal.alarm(0)
@@ -224,7 +200,21 @@ def fetchTitle(url):
     signal.alarm(0)
     return title
 
-
+def fetchTitleBITLY(url):
+    import bitly_api
+    
+    apikey = "ef1e5e332dff2e7649d4c7f4902040db7d51c387"
+    
+    c = bitly_api.Connection(login="hamatti", access_token=apikey)
+    shorturl = c.shorten(url)
+    try:
+        ml = MLStripper()
+        ml.feed(c.link_content(shorturl['url']))
+        return ml.get_data().encode('utf-8')
+    except:
+        return "No title"
+    
+# Hakee satunnaisesta runosta satunnaisen kohdan ja palauttaa 3 riviä pilkuilla erotettuna
 def fetchPoemLines():
   """
   Reads random poem from global poems variable and then returns 3 lines from that poem
@@ -236,7 +226,8 @@ def fetchPoemLines():
   if poemstring.endswith(","):
     poemstring = poemstring[:-1]
   return poemstring
-  
+
+# Lukee poems.txt-tiedostossa olevien tiedostonimien vastaavat tiedostot globaaliin poems-muuttujaan
 def readPoems():
   """
   Read poems present in poems.txt
@@ -249,6 +240,7 @@ def readPoems():
       poemlines.append(line.strip())
     poems.append(poemlines)
 
+# Wikipedia-haku
 def readWikipedia(query):
   """
   Based on query, tries to find corresponding article from english or finnish wikipedia and then returns first paragraph and url to article.
@@ -297,6 +289,7 @@ def fetchFood(restaurant):
   """
   Shows menu for student restaurants in Turku
   """
+  # Murkinat.appspot.comin käyttämät ravintolakohtaiset id-tunnukset
   restaurants = {'assari': 'restaurant_ag5zfm11cmtpbmF0LWhyZHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGMG4Agw', 'delica': 'restaurant_ag5zfm11cmtpbmF0LWhyZHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGPnPAgw', 'ict': 'restaurant_ag5zfm11cmtpbmF0LWhyZHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGPnMAww', 'mikro': 'restaurant_ag5zfm11cmtpbmF0LWhyZHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGOqBAgw', 'tottisalmi': 'restaurant_ag5zfm11cmtpbmF0LWhyZHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGMK7AQw', 'tottis': 'restaurant_ag5zfm11cmtpbmF0LWhyZHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGMK7AQw'}
 
   if restaurants.has_key(restaurant.lower()):
@@ -321,37 +314,10 @@ def fetchFood(restaurant):
   else:
     return "Tuntematon ravintola"
 
-def openingTimes(restaurant):
-  restaurants = {'assari': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGMG4Agw', 'delica': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGPnPAgw', 'ict': 'restaurant_aghtdXJraW5hdHIa\
-CxISX1Jlc3RhdXJhbnRNb2RlbFYzGPnMAww', 'mikro': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGOqBAgw', 'tottisalmi': 'restaurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGMK7AQw', 'tottis': 're\
-staurant_aghtdXJraW5hdHIaCxISX1Jlc3RhdXJhbnRNb2RlbFYzGMK7AQw'}
-  if restaurants.has_key(restaurant.lower()):
-    soup = BeautifulSoup(urllib.urlopen("http://murkinat.appspot.com"))
-    rest_div = soup.find(id="%s" % restaurants[restaurant.lower()])
-    opening_table = rest_div.find('table', 'restaurantInfoOpeningTimes')
-    openings = "%s: " % restaurant
-    
-    dates_and_times = opening_table.find_all('tr')
-    for dat in dates_and_times:
-      openings += "%s %s, " % (dat.find('td', 'dayRange').string.strip(), dat.find('td', 'times').string.strip())
-    return openings[:-2]
-  else:
-    return "Tuntematon ravintola"
-    
-def weather(city):
-  """
-  Return google weather for wanted city
-  """
-  try:
-    weather = pywapi.get_weather_from_google("%s finland" % city)
-    return "%s: %s and %s C with %s %s" % (city, string.lower(weather['current_conditions']['condition']), weather['current_conditions']['temp_c'],weather['current_conditions']['humidity'],weather['current_conditions']['wind_condition'] )
-  except:
-    return "Unknown city"
-
+# Hakee Steam-palvelusta pelin käyttäen järjestelmän sisäistä hakukonetta ja palauttaa pelin nimen, kuvauksen sekä hinnan
 def steamPrice(game):
   try:
     search_url = 'http://store.steampowered.com/search/?term=%s&category1=998' % game
-    test_url = 'http://store.steampowered.com/app/47400/'
     search_soup = BeautifulSoup(urllib.urlopen(search_url))
     searched_apps = search_soup.find('a', 'search_result_row')
 
@@ -375,8 +341,12 @@ def steamPrice(game):
   except:
     return "Error, game not found", "http://store.steampowered.com"
 
+# Valitsee annetuista vaihtoehdoista satunnaisesti yhden ja palauttaa sen
+def decide(options):
+    return options[random.randint(0,len(options)-1)]
+
 def main():
-  # Register handlers
+  # Lisätään irc-objektiin käsittelytoiminnot eri tapahtumille
   irc.add_global_handler ( 'privnotice', handlePrivNotice ) #Private notice
   irc.add_global_handler ( 'welcome', handleEcho ) # Welcome message
   irc.add_global_handler ( 'yourhost', handleEcho ) # Host message
@@ -401,15 +371,16 @@ def main():
   irc.add_global_handler ( 'privmsg', handlePrivMsg ) # Private messages
   irc.add_global_handler ( 'nicknameinuse', handleNewNick ) # Gives new nickname if already used
 
-  # Create server object, connect and join
+  # Yhdistää botin haluttuun verkkoon ja porttiin annetuilla konfiguraatioparametreilla
   server.connect(network, port, nick, ircname = name)
-  server.join(channel)
-  
-  # Read poems to memory
+  # Liittää botin kanaville
+  for channel in channels:
+    server.join(channel)
+
+  # Lukee runot muistiin
   readPoems()
 
-  # Infinite loop
-  
+  # Käynnistää irclibin ikuisen loopin, jossa botti ottaa vastaan kanavalta tulevan syötteen  
   irc.process_forever()
 
 if __name__ == '__main__':
