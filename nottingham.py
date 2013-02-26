@@ -16,6 +16,9 @@ import urllib, urllib2
 from bs4 import BeautifulSoup
 # konfiguraatiotiedostojen lukemiseen
 import ConfigParser
+# Tietokannan käyttöä varten
+import sqlite3 as sql
+import datetime
 
 from HTMLParser import HTMLParser
 
@@ -41,6 +44,7 @@ nick = config.get('Bot', 'nick')
 name = config.get('Bot', 'name')
 
 admins = config.get('Users', 'admins').split(',')
+todoadmin = config.get('Users', 'todo').split(',')
 
 # Luodaan irc-objekti ja serverimuuttuja irclib-kirjastosta
 irc = irclib.IRC()
@@ -133,9 +137,45 @@ def handlePubMsg(connection, event):
       else:
         choice = decide(message.split(' '))
         server.privmsg(event.target(), '%s, noppa ratkaisee: %s' % (name, choice))
+    # Oikotie NOOOOO-linkkiin
     elif message.lower().startswith('!no'):
       server.privmsg(event.target(), 'http://nooooooooooooooo.com/')
-       
+    # TODO-toiminnallisuus
+    elif message.lower().startswith('!todo'):
+        if user in todoadmin and len(message.split(" ")) > 1:
+            con = sql.connect('todo.db')
+            cur = con.cursor()
+            dt = datetime.datetime.now()
+            date = "%s-%s-%s %s:%s:%s" % (dt.year, dt.month, dt.day, int(dt.hour)+1, dt.minute, dt.second)
+            cur.execute("INSERT INTO todo (thing, date, priority) VALUES(?, ?, 4)",(" ".join(message.split(" ")[1:]).encode('utf-8'),date ))
+            con.commit()
+            cur.execute("SELECT oid FROM todo WHERE oid = (select max(oid) from todo)")
+            new_oid = cur.fetchone()[0]
+            server.privmsg(event.target(), "todo #%s logged" % new_oid)
+        else:
+            server.privmsg(event.target(), "TODO-lista: http://hamatti.org/todo/")
+    elif message.lower().startswith('!prio') and user in todoadmin:
+        priors = message.split(" ")
+        if len(priors) < 2:
+            server.privmsg(event.target(), "Usage: !prior [new_priority] [oid](optional) - admins only")
+        else:
+            con = sql.connect('todo.db')
+            cur = con.cursor()
+            oid = 0
+            if len(priors) == 2:
+                cur.execute("select oid from todo where oid = (select max(oid) from todo)")
+                oid = cur.fetchone()[0]
+            elif len(priors) == 3:
+                oid = priors[2]
+            cur.execute("UPDATE todo SET priority = ? WHERE oid = ?", (priors[1], oid))
+            con.commit()
+    elif message.lower().startswith('!help'):
+        helps = ['!steam', '!what', '!decide', '!food', '!todo (admin only)', '!prio (admin only)', '!poem']
+        helpstring = ", ".join(sorted(helps))
+        server.privmsg(event.target(), helpstring)
+    elif message.lower().startswith('!badumtsh'):
+        server.privmsg(event.target(), "http://instantrimshot.com/")
+
   except:
     server.privmsg(event.target(), "Error at level 3")
 
@@ -260,9 +300,9 @@ def readWikipedia(query):
       data = resource.read()
       resource.close()
       soup = BeautifulSoup(data)
-      paragraph = soup.find('div',id="bodyContent").p.get_text()
+      paragraph = soup.find('div',id="mw-content-text").p.get_text()
     
-      return  "%s @ %s" % (paragraph, url)
+      return  "%s @ %s" % (paragraph[:300], url)
     else:
       site = mwclient.Site("fi.wikipedia.org")
       page = site.Pages[query]
@@ -276,8 +316,8 @@ def readWikipedia(query):
         data = resource.read()
         resource.close()
         soup = BeautifulSoup(data)
-        paragraph = soup.find('div',id="bodyContent").p.get_text()
-        return  "%s @ %s" % (paragraph, url)
+        paragraph = soup.find('div',id="mw-content-text").p.get_text()
+        return  "%s @ %s" % (paragraph[:300], url)
             
       else:
         return "Page not found."
@@ -343,7 +383,11 @@ def steamPrice(game):
 
 # Valitsee annetuista vaihtoehdoista satunnaisesti yhden ja palauttaa sen
 def decide(options):
-    return options[random.randint(0,len(options)-1)]
+    decision = random.randint(0,len(options)-1)
+    if (decision > 0) :
+        return options[decision]
+    else:
+        return decide(options)
 
 def main():
   # Lisätään irc-objektiin käsittelytoiminnot eri tapahtumille

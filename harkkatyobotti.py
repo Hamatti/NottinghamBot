@@ -173,6 +173,9 @@ def handlePubMsg(connection, event):
         helps = ['!steam', '!what', '!decide', '!food', '!todo (admin only)', '!prio (admin only)', '!poem']
         helpstring = ", ".join(sorted(helps))
         server.privmsg(event.target(), helpstring)
+    elif message.lower().startswith('!badumtsh'):
+        server.privmsg(event.target(), "http://instantrimshot.com/")
+
   except:
     server.privmsg(event.target(), "Error at level 3")
 
@@ -380,7 +383,11 @@ def steamPrice(game):
 
 # Valitsee annetuista vaihtoehdoista satunnaisesti yhden ja palauttaa sen
 def decide(options):
-    return options[random.randint(0,len(options)-1)]
+    decision = random.randint(0,len(options)-1)
+    if (decision > 0) :
+        return options[decision]
+    else:
+        return decide(options)
 
 def main():
   # Lisätään irc-objektiin käsittelytoiminnot eri tapahtumille
