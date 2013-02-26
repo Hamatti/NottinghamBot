@@ -383,11 +383,8 @@ def steamPrice(game):
 
 # Valitsee annetuista vaihtoehdoista satunnaisesti yhden ja palauttaa sen
 def decide(options):
-    decision = random.randint(0,len(options)-1)
-    if (decision > 0) :
-        return options[decision]
-    else:
-        return decide(options)
+    decision = random.randint(1,len(options)-1)
+    return options[decision]
 
 def main():
   # Lisätään irc-objektiin käsittelytoiminnot eri tapahtumille
