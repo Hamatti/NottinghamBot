@@ -175,6 +175,8 @@ def handlePubMsg(connection, event):
         server.privmsg(event.target(), helpstring)
     elif message.lower().startswith('!badumtsh'):
         server.privmsg(event.target(), "http://instantrimshot.com/")
+    elif message.lower().startswith('!reload') and user == 'hamatti':
+        readPoems()
 
   except:
     server.privmsg(event.target(), "Error at level 3")
