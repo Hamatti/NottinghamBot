@@ -77,7 +77,7 @@ class Nottingham(object):
 				# If there is an url, parse its title
 				url = url_regex_search.group(0).split(' ')[0]		
 				result_of_command = self.commands['title'](url)
-				self.server.privmsg(target, result_of_command)
+				
 			elif message.startswith('!'):
 				# No url so let's see if it's a command
 				command = message.split(' ')[0].split('!')[1]
