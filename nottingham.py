@@ -37,8 +37,7 @@ class Nottingham(object):
 		self.server = self.irc.server()
 
 		self.commands = {'title': self.fetch_title, 'poem': self.fetch_poem, 'what': self.read_wikipedia, 'food': self.fetch_food, 'steam': self.steam_price, 'decide': self.decide, 'todo': self.todo, 'prio': self.change_priority, 'help': self.help, 'reload': self.reload_poems, 'no': self.no, 'badumtsh': self.badumtsh }
-
-		self.url_match_pattern = re.compile('(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-?]*)\/?')
+		self.url_match_pattern = re.compile('(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-?&]*)\/?')
 
 		self.read_poems_to_memory()
 
@@ -68,7 +67,7 @@ class Nottingham(object):
 		user = event.source().split('!')[1].split('@')[0]
 		target = event.target()
 		message = event.arguments()[0]
-		source = event.arguments()[0]
+		source = event.source()
 		
 		try:
 			# Try to find url in the message
@@ -92,7 +91,7 @@ class Nottingham(object):
 			self.server.privmsg(target, result_of_command)
 		except (TitleException, PoemException, WikiException, RestaurantException, SteamException, DecisionException, TodoException, HelpException, Exception) as e:
 			self.server.privmsg(target, e)
-			raise
+			
 
 	def handle_priv_msg(self, connection, event):
 		pass
@@ -151,7 +150,8 @@ class Nottingham(object):
 
 			return title
 		except:
-			raise TitleException("Not found")
+			signal.alarm(0)
+			raise TitleException("Not found.")
 
 
 	def fetch_poem(self, name, user, arguments, target):
