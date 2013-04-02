@@ -38,7 +38,7 @@ class Nottingham(object):
 
 		self.commands = {'title': self.fetch_title, 'poem': self.fetch_poem, 'what': self.read_wikipedia, 'food': self.fetch_food, 'steam': self.steam_price, 'decide': self.decide, 'todo': self.todo, 'prio': self.change_priority, 'help': self.help, 'reload': self.reload_poems, 'no': self.no, 'badumtsh': self.badumtsh }
 
-		self.url_match_pattern = re.compile('(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)\/?')
+		self.url_match_pattern = re.compile('(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-?]*)\/?')
 
 		self.read_poems_to_memory()
 
@@ -92,6 +92,7 @@ class Nottingham(object):
 			self.server.privmsg(target, result_of_command)
 		except (TitleException, PoemException, WikiException, RestaurantException, SteamException, DecisionException, TodoException, HelpException, Exception) as e:
 			self.server.privmsg(target, e)
+			raise
 
 	def handle_priv_msg(self, connection, event):
 		pass
@@ -150,7 +151,7 @@ class Nottingham(object):
 
 			return title
 		except:
-			raise TitleError("Not found")
+			raise TitleException("Not found")
 
 
 	def fetch_poem(self, name, user, arguments, target):
@@ -342,8 +343,9 @@ class Nottingham(object):
 		self.server.connect(self.network, self.port, self.nick, ircname = self.name)
 		for channel in self.channels:
 			self.server.join(channel)
-
+		
 		self.irc.process_forever()
+		
 
 if __name__ == '__main__':
 	bot = Nottingham()
