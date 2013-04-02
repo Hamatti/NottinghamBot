@@ -201,17 +201,21 @@ class Nottingham(object):
 			if restaurants.has_key(restaurant):
 				url = 'http://murkinat.appspot.com'
 				soup = self.get_soup(url)
-
+				
 				meal_div = soup.find(id='%s' % restaurants[restaurant])
+
+				
 				meal_rows = meal_div.find_all('tr', 'meal')
 
 				meals = {}
 				for meal_row in meal_rows:
+
 					meals[meal_row.find('td', 'mealName hyphenate').string.strip()] = meal_row.find('span', 'mealPrice').string.strip()
 				
 				meal_string = '%s: ' % restaurant
+
 				for meal, price in meals.iteritems():
-					mealstring += '%s: %s, ' % (meal, price)
+					meal_string += '%s: %s, ' % (meal, price)
 				return '%s @ %s' % (meal_string[:-2], url)
 			else:
 				raise RestaurantException('Tuntematon ravintola')
