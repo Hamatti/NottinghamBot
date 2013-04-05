@@ -37,7 +37,7 @@ class Nottingham(object):
 		self.server = self.irc.server()
 
 		self.commands = {'title': self.fetch_title, 'poem': self.fetch_poem, 'what': self.read_wikipedia, 'food': self.fetch_food, 'steam': self.steam_price, 'decide': self.decide, 'todo': self.todo, 'prio': self.change_priority, 'help': self.help, 'reload': self.reload_poems, 'no': self.no, 'badumtsh': self.badumtsh }
-		self.url_match_pattern = re.compile('(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-?&]*)\/?')
+		self.url_match_pattern = re.compile(ur'(https?:\/\/|www)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w\.\-\?%&+]*)\/?', re.UNICODE)
 
 		self.read_poems_to_memory()
 
@@ -59,7 +59,7 @@ class Nottingham(object):
 		user = event.source().split('!')[1].split('@')[0]
 		print '%s has joined %s' % (name, event.target())
 		if user in self.admins:
-			server.mode(event.target(), '+o %s' % name)
+			self.server.mode(event.target(), '+o %s' % name)
 
 	def handle_pub_msg(self, connection, event):
 		''' handles all commands (anything starting with !) '''
@@ -71,12 +71,14 @@ class Nottingham(object):
 		
 		try:
 			# Try to find url in the message
-			url_regex_search = re.search(self.url_match_pattern, message)
+			url_regex_search = re.search(self.url_match_pattern, message.decode('utf-8'))
 			if url_regex_search:
 				# If there is an url, parse its title
-				url = url_regex_search.group(0).split(' ')[0]		
-				result_of_command = self.commands['title'](url)
-				
+				if not '@not' in message:
+					url = url_regex_search.group(0).split(' ')[0]		
+					result_of_command = self.commands['title'](url.encode('utf-8'))
+				else:
+					return				
 			elif message.startswith('!'):
 				# No url so let's see if it's a command
 				command = message.split(' ')[0].split('!')[1]
@@ -124,7 +126,7 @@ class Nottingham(object):
 		try:
 			def timeout_handler(signum, frame):
 				pass
-			
+			print url
 			old_handler = signal.signal(signal.SIGALRM, timeout_handler)
 			signal.alarm(6)
 
@@ -216,7 +218,7 @@ class Nottingham(object):
 
 				for meal, price in meals.iteritems():
 					meal_string += '%s: %s, ' % (meal, price)
-				return '%s @ %s' % (meal_string[:-2], url)
+				return '%s @ %s' % (meal_string[:-2].encode('utf-8'), url)
 			else:
 				raise RestaurantException('Tuntematon ravintola')
 		except:
