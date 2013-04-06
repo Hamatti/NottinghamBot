@@ -37,7 +37,7 @@ class Nottingham(object):
 		self.server = self.irc.server()
 
 		self.commands = {'title': self.fetch_title, 'poem': self.fetch_poem, 'what': self.read_wikipedia, 'food': self.fetch_food, 'steam': self.steam_price, 'decide': self.decide, 'todo': self.todo, 'prio': self.change_priority, 'help': self.help, 'reload': self.reload_poems, 'no': self.no, 'badumtsh': self.badumtsh }
-		self.url_match_pattern = re.compile(ur'(https?:\/\/|www)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w\.\-\?%&+]*)\/?', re.UNICODE)
+		self.url_match_pattern = re.compile(ur'(https?:\/\/|www)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w\.\-\?%&=+]*)\/?', re.UNICODE)
 
 		self.read_poems_to_memory()
 
@@ -91,6 +91,9 @@ class Nottingham(object):
 			else:
 				return
 			self.server.privmsg(target, result_of_command)
+		except (UnicodeDecodeError, UnicodeEncodeError) as e:
+			# This is for users who have other than utf-8 and for them regex matching fails for every word containing unicode chars.
+			return
 		except (TitleException, PoemException, WikiException, RestaurantException, SteamException, DecisionException, TodoException, HelpException, Exception) as e:
 			self.server.privmsg(target, e)
 			
