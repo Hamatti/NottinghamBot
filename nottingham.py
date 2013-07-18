@@ -73,10 +73,12 @@ class Nottingham(object):
 		try:
 			# Try to find url in the message
 			url_regex_search = re.search(self.url_match_pattern, message.decode('utf-8'))
-			if '...' in message.decode('utf-8'):
-				return
-
+			
 			if url_regex_search:
+
+				if (not 'http' in message.decode('utf-8') and '...' in message.decode('utf-8')):
+					return
+
 				# If there is an url, parse its title
 				if not '@not' in message:
 					url = url_regex_search.group(0).split(' ')[0]		
