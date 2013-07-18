@@ -38,6 +38,7 @@ class Nottingham(object):
 
 		self.commands = {'title': self.fetch_title, 'poem': self.fetch_poem, 'what': self.read_wikipedia, 'food': self.fetch_food, 'steam': self.steam_price, 'decide': self.decide, 'todo': self.todo, 'prio': self.change_priority, 'help': self.help, 'reload': self.reload_poems, 'no': self.no, 'badumtsh': self.badumtsh, 'gaben': self.praise_gaben }
 		self.url_match_pattern = re.compile(ur'(https?:\/\/|www)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w\.\-\?%&=+]*)\/?', re.UNICODE)
+		self.three_dots_pattern = re.compile(ur'[a-z]*\.{1}\.{1}\.{1}', re.UNICODE)
 
 		self.read_poems_to_memory()
 
@@ -72,6 +73,9 @@ class Nottingham(object):
 		try:
 			# Try to find url in the message
 			url_regex_search = re.search(self.url_match_pattern, message.decode('utf-8'))
+			if '...' in message.decode('utf-8'):
+				return
+
 			if url_regex_search:
 				# If there is an url, parse its title
 				if not '@not' in message:
