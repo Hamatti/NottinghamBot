@@ -1,0 +1,10 @@
+import nottingham
+import re
+
+ham = nottingham.Nottingham()
+ham.set_up()
+
+url = 'http://www.hs.fi/kotimaa/S%C3%A4hk%C3%B6iseen+reseptiin+ei+mahdu+teksti%C3%A4++korjaus+kest%C3%A4%C3%A4+puolitoista+vuotta/a1365125968994'.decode('utf-8')
+print re.search(ham.url_match_pattern, url).group()
+
+print ham.fetch_title(url)

@@ -36,7 +36,7 @@ class Nottingham(object):
 		self.irc = irclib.IRC()
 		self.server = self.irc.server()
 
-		self.commands = {'title': self.fetch_title, 'poem': self.fetch_poem, 'what': self.read_wikipedia, 'food': self.fetch_food, 'steam': self.steam_price, 'decide': self.decide, 'todo': self.todo, 'prio': self.change_priority, 'help': self.help, 'reload': self.reload_poems, 'no': self.no, 'badumtsh': self.badumtsh }
+		self.commands = {'title': self.fetch_title, 'poem': self.fetch_poem, 'what': self.read_wikipedia, 'food': self.fetch_food, 'steam': self.steam_price, 'decide': self.decide, 'todo': self.todo, 'prio': self.change_priority, 'help': self.help, 'reload': self.reload_poems, 'no': self.no, 'badumtsh': self.badumtsh, 'gaben': self.praise_gaben }
 		self.url_match_pattern = re.compile(ur'(https?:\/\/|www)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w\.\-\?%&=+]*)\/?', re.UNICODE)
 
 		self.read_poems_to_memory()
@@ -77,6 +77,7 @@ class Nottingham(object):
 				if not '@not' in message:
 					url = url_regex_search.group(0).split(' ')[0]		
 					result_of_command = self.commands['title'](url.encode('utf-8'))
+					result_url = None
 				else:
 					return				
 			elif message.startswith('!'):
@@ -84,13 +85,16 @@ class Nottingham(object):
 				command = message.split(' ')[0].split('!')[1]
 				arguments = message.split(' ')[1:]	
 				if self.commands.has_key(command):
-					result_of_command = self.commands[command](name, user, arguments, target)
+					result_of_command, result_url = self.commands[command](name, user, arguments, target)
 				else:
 					# Unknown command so do nothing
 					return
 			else:
 				return
 			self.server.privmsg(target, result_of_command)
+			if result_url:
+				self.server.privmsg(target, result_url)
+
 		except (UnicodeDecodeError, UnicodeEncodeError) as e:
 			# This is for users who have other than utf-8 and for them regex matching fails for every word containing unicode chars.
 			return
@@ -99,10 +103,29 @@ class Nottingham(object):
 			
 
 	def handle_priv_msg(self, connection, event):
-		pass
+		if event.source().split('!')[0].lower() == 'hamatti' or event.source().split('!')[0].lower() == 'brigesh':
+			message = event.arguments()[0]
+
+			action, slapped = message.split()
+			target = '#nottingham'
+			if action == 'slap':
+				self.server.privmsg(target, "Haista %s vittu" % slapped)
+
+	def handle_mode(self, connection, event):
+		self.server.whois((event.arguments()[1],))
+		print self.whoissed_user
+		print self.whoissed_nick
+		print event.arguments()[1]
+		if event.arguments()[0] == '-o' and self.whoissed_user in self.admins and self.whoissed_nick == event.arguments()[1]:
+			self.server.mode(event.target(), '+o %s' % event.arguments()[1])
 
 	def handle_new_nick(self, connection, event):
 		nick = '%s_' % server.get_nickname()
+
+	def handle_whois(self, connection, event):
+		self.whoissed_user = event.arguments()[1]
+		self.whoissed_nick = event.arguments()[0]
+		print self.whoissed_user
 
 	def read_poems_to_memory(self):
 		''' Fills self.poems with all poems listed in poems.txt '''
@@ -123,6 +146,9 @@ class Nottingham(object):
 		page_contents = resource.read()
 		resource.close()
 		return BeautifulSoup(page_contents, 'lxml')
+
+	def praise_gaben(self, name, user, arguments, target):
+		return 'http://gaben.tv/', None
 
 	def fetch_title(self, url):
 		''' Given url, parse title '''
@@ -168,7 +194,7 @@ class Nottingham(object):
 			poem_string = '%s %s %s' % (poem[random_place], poem[random_place+1], poem[random_place+2])
 			if poem_string.endswith(','):
 				poem_string = poem_string[:-1]
-			return poem_string
+			return poem_string, None
 		except:
 			raise PoemException("Literature is dead")
 
@@ -191,7 +217,7 @@ class Nottingham(object):
 			soup = self.get_soup(url)
 			opening_paragraph = soup.find('div', id='mw-content-text').p.get_text()
 
-			return '%s @ %s' % (opening_paragraph[:300].encode('utf-8'), url)
+			return '%s' % (opening_paragraph[:300].encode('utf-8')), url
 
 		except:
 			raise WikiException('Page not found')
@@ -221,7 +247,7 @@ class Nottingham(object):
 
 				for meal, price in meals.iteritems():
 					meal_string += '%s: %s, ' % (meal, price)
-				return '%s @ %s' % (meal_string[:-2].encode('utf-8'), url)
+				return '%s' % (meal_string[:-2].encode('utf-8')), url
 			else:
 				raise RestaurantException('Tuntematon ravintola')
 		except:
@@ -251,7 +277,7 @@ class Nottingham(object):
 				price_div = soup.find('div', 'discount_final_price')
 			price = price_div.string.strip()
 			game_string = '%s: %s Cost: %s' % (game_name, description[:300], price)
-			return game_string.encode('utf-8')
+			return game_string.encode('utf-8'), search_url
 
 		except:
 			raise SteamException('There was an error. Probably your fault.')
@@ -261,8 +287,8 @@ class Nottingham(object):
 		try:
 			if len(arguments) == 0 or arguments[0] == '':
 				raise DecisionException('Usage: !decide [option1] [option2] .. [optionN]')
-			decision = random.randint(1, len(arguments)-1)
-			return 'Noppa ratkaisee: %s' % arguments[decision]
+			decision = random.randint(0, len(arguments)-1)
+			return 'Noppa ratkaisee: %s' % arguments[decision], None
 		except:
 			raise DecisionException('Uh, couldn\'t decide')
 
@@ -278,9 +304,9 @@ class Nottingham(object):
 				connection.commit()
 				cursor.execute('SELECT max(oid) FROM todo')
 				oid = cursor.fetchone()[0]
-				return 'todo #%s logged' % oid
+				return 'todo #%s logged' % oid, None
 			else:
-				return 'http://hamatti.org/todo/'
+				return 'http://hamatti.org/todo/', None
 		except:
 			raise TodoException('Database says no. Fuck those databases')
 
@@ -309,21 +335,21 @@ class Nottingham(object):
 			for command in self.commands.keys():
 				if command != 'title':
 					help_string += '!%s, ' % command
-			return help_string[:-2]
+			return help_string[:-2], None
 		except:
 			raise HelpException('Your parents hated you and I won\'t help you')
 
 	def badumtsh(self, name, user, arguments, target):
-		return 'http://instantrimshot.com/'
+		return 'http://instantrimshot.com/', None
 
 	def no(self, name, user, arguments, target):
-		return 'http://nooooooooooooooo.com/'
+		return 'http://nooooooooooooooo.com/', None
 
 	def reload_poems(self, name, user, arguments, target):
 		''' Reload poems from the file'''
 		if user == 'hamatti':
 			self.read_poems_to_memory()
-		return 'reloaded'
+		return 'reloaded', None
 
 	def main(self):
 		self.set_up()
@@ -349,6 +375,8 @@ class Nottingham(object):
 	  	self.irc.add_global_handler ( 'pubmsg', self.handle_pub_msg ) # Public messages
 	  	self.irc.add_global_handler ( 'privmsg', self.handle_priv_msg ) # Private messages
 	  	self.irc.add_global_handler ( 'nicknameinuse', self.handle_new_nick ) # Gives new nickname if already used
+	  	# self.irc.add_global_handler ( 'mode', self.handle_mode ) # Handle change of mode
+	  	# self.irc.add_global_handler ( 'whoisuser', self.handle_whois) # Handle whois response
 		self.server.connect(self.network, self.port, self.nick, ircname = self.name)
 		for channel in self.channels:
 			self.server.join(channel)

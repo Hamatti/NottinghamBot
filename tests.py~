@@ -1,0 +1,11 @@
+import unittest
+from nottingham-v2 import *
+
+class nottinghamTest(unittest.TestCase):
+
+    def setUp(self):
+        self.bot = Nottingham()
+
+    def test_title_returns_correct_title(self):
+        title = self.bot.fetch_title('http://www.google.com')
+        self.assertEqual('App. Doc. Something.', title)
