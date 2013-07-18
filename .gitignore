@@ -28,6 +28,5 @@ pip-log.txt
 
 #Config file
 config.conf
-
-Poems
 *.txt
+*.db
