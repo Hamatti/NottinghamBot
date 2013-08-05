@@ -264,7 +264,7 @@ class Nottingham(object):
 		try:
 			if len(arguments) == 0:
 				raise SteamException('Usage: !steam [game]')
-			search_url = 'http://store.steampowered.com/search/?term=%s&category1=998' % ' '.join(arguments)
+			search_url = 'http://store.steampowered.com/search/?term=%s&category1=998' % '+'.join(arguments)
 			soup = self.get_soup(search_url)
 			searched_apps = soup.find('a', 'search_result_row')
 
