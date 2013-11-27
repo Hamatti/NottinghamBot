@@ -5,6 +5,7 @@
 
 import irclib
 import urllib, urllib2
+import json
 import mwclient, lxml
 import sys, os, signal, mimetypes, types, re
 import random
@@ -36,7 +37,7 @@ class Nottingham(object):
         self.irc = irclib.IRC()
         self.server = self.irc.server()
 
-        self.commands = {'title': self.fetch_title, 'poem': self.fetch_poem, 'what': self.read_wikipedia, 'food': self.fetch_food, 'steam': self.steam_price, 'decide': self.decide, 'todo': self.todo, 'prio': self.change_priority, 'help': self.help, 'reload': self.reload_poems, 'no': self.no, 'badumtsh': self.badumtsh, 'gaben': self.praise_gaben }
+        self.commands = {'title': self.fetch_title, 'poem': self.fetch_poem, 'what': self.read_wikipedia, 'food': self.fetch_food, 'steam': self.steam_price, 'decide': self.decide, 'todo': self.todo, 'prio': self.change_priority, 'help': self.help, 'reload': self.reload_poems, 'no': self.no, 'badumtsh': self.badumtsh, 'gaben': self.praise_gaben, 'imdb': self.fetch_imdb }
         self.url_match_pattern = re.compile(ur'(https?:\/\/|www)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w\.\-\?%&=+]*)\/?', re.UNICODE)
         self.three_dots_pattern = re.compile(ur'[a-z]*\.{1}\.{1}\.{1}', re.UNICODE)
 
@@ -253,6 +254,16 @@ class Nottingham(object):
                 raise RestaurantException('Tuntematon ravintola')
         except:
             raise RestaurantException('Stay hungry. Stay foolish.')
+
+    def fetch_imdb(self, name, user, arguments, target):
+        try:
+            BASEURL = 'http://mymovieapi.com/?type=json&title=%s'
+            title = '%20'.join(arguments)
+            url = BASEURL % title
+            movie_data = json.loads(urllib.urlopen(url).read())[0]
+            return "%s (%s): %s" % (movie_data['title'], movie_data['year'], movie_data['imdb_url']), None
+        except:
+            raise IMDBException('Movie not found, sorry')
 
     def steam_price(self, name, user, arguments, target):
         ''' Given game name, search and return description and current price '''

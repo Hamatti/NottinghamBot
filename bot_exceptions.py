@@ -21,3 +21,6 @@ class TodoException(Exception):
 
 class HelpException(Exception):
 	pass
+
+class IMDBException(Exception):
+	pass
