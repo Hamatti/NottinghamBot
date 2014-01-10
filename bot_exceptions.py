@@ -7,6 +7,9 @@ class PoemException(Exception):
 class WikiException(Exception):
 	pass
 
+class MailTrackingException(Exception):
+    pass
+
 class RestaurantException(Exception):
 	pass
 

@@ -37,7 +37,7 @@ class Nottingham(object):
         self.irc = irclib.IRC()
         self.server = self.irc.server()
 
-        self.commands = {'title': self.fetch_title, 'poem': self.fetch_poem, 'what': self.read_wikipedia, 'food': self.fetch_food, 'steam': self.steam_price, 'decide': self.decide, 'todo': self.todo, 'prio': self.change_priority, 'help': self.help, 'reload': self.reload_poems, 'no': self.no, 'badumtsh': self.badumtsh, 'gaben': self.praise_gaben, 'imdb': self.fetch_imdb }
+        self.commands = {'title': self.fetch_title, 'poem': self.fetch_poem, 'what': self.read_wikipedia, 'food': self.fetch_food, 'steam': self.steam_price, 'decide': self.decide, 'todo': self.todo, 'prio': self.change_priority, 'help': self.help, 'reload': self.reload_poems, 'no': self.no, 'badumtsh': self.badumtsh, 'gaben': self.praise_gaben, 'imdb': self.fetch_imdb, 'posti': self.track_mail }
         self.url_match_pattern = re.compile(ur'(https?:\/\/|www)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w\.\-\?%&=+]*)\/?', re.UNICODE)
         self.three_dots_pattern = re.compile(ur'[a-z]*\.{1}\.{1}\.{1}', re.UNICODE)
 
@@ -70,11 +70,11 @@ class Nottingham(object):
         target = event.target()
         message = event.arguments()[0]
         source = event.source()
-        
+
         try:
             # Try to find url in the message
             url_regex_search = re.search(self.url_match_pattern, message.decode('utf-8'))
-            
+
             if url_regex_search:
 
                 if (not 'http' in message.decode('utf-8') and '...' in message.decode('utf-8')):
@@ -82,15 +82,15 @@ class Nottingham(object):
 
                 # If there is an url, parse its title
                 if not '@not' in message:
-                    url = url_regex_search.group(0).split(' ')[0]       
+                    url = url_regex_search.group(0).split(' ')[0]
                     result_of_command = self.commands['title'](url.encode('utf-8'))
                     result_url = None
                 else:
-                    return              
+                    return
             elif message.startswith('!'):
                 # No url so let's see if it's a command
                 command = message.split(' ')[0].split('!')[1]
-                arguments = message.split(' ')[1:]  
+                arguments = message.split(' ')[1:]
                 if self.commands.has_key(command):
                     result_of_command, result_url = self.commands[command](name, user, arguments, target)
                 else:
@@ -107,7 +107,7 @@ class Nottingham(object):
             return
         except (TitleException, PoemException, WikiException, RestaurantException, SteamException, DecisionException, TodoException, HelpException, Exception) as e:
             self.server.privmsg(target, e)
-            
+
 
     def handle_priv_msg(self, connection, event):
         if event.source().split('!')[0].lower() == 'hamatti' or event.source().split('!')[0].lower() == 'brigesh':
@@ -264,6 +264,28 @@ class Nottingham(object):
             return "%s (%s): %s" % (movie_data['title'], movie_data['year'], movie_data['imdb_url']), None
         except:
             raise IMDBException('Movie not found, sorry')
+
+    def track_mail(self, name, user, arguments, target):
+        try:
+            if len(arguments) == 0:
+                raise MailTrackingException('Usage: !posti [seurantakoodi]')
+            LAST_EVENT_ROW = 1
+            mail_search_url = 'http://www.posti.fi/itemtracking/posti/search_by_shipment_id?lang=fi&ShipmentId=%s'
+
+            soup = BeautifulSoup(urllib.urlopen(mail_search_url % arguments[0]))
+            events = soup.find('table', {'id': 'shipment-event-table'})
+
+            last_event = events.findAll('tr')[LAST_EVENT_ROW]
+            last_event_title = last_event.find('div', {'class': 'shipment-event-table-header'}).string
+            last_event_row = last_event.findAll('div', {'class': 'shipment-event-table-row'})
+            last_event_label = last_event_row[0].find('span', {'class': 'shipment-event-table-label'}).string
+            last_event_data = last_event_row[0].find('span', {'class': 'shipment-event-table-data'}).string
+            last_event_place = last_event_row[1].find('span', {'class': 'shipment-event-table-data'}).string
+
+            last_event_info = '%s %s @ %s' % (last_event_label, last_event_data, last_event_place)
+            return last_event_title.encode('utf-8'), last_event_info.encode('utf-8')
+        except:
+            raise MailTrackingException('You have no mail.')
 
     def steam_price(self, name, user, arguments, target):
         ''' Given game name, search and return description and current price '''
