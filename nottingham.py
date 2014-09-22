@@ -37,7 +37,22 @@ class Nottingham(object):
         self.irc = irclib.IRC()
         self.server = self.irc.server()
 
-        self.commands = {'title': self.fetch_title, 'poem': self.fetch_poem, 'what': self.read_wikipedia, 'food': self.fetch_food, 'steam': self.steam_price, 'decide': self.decide, 'todo': self.todo, 'prio': self.change_priority, 'help': self.help, 'reload': self.reload_poems, 'no': self.no, 'badumtsh': self.badumtsh, 'gaben': self.praise_gaben, 'imdb': self.fetch_imdb, 'posti': self.track_mail }
+        self.commands = {'title': self.fetch_title,
+                         'poem': self.fetch_poem,
+                         'what': self.read_wikipedia,
+                         'food': self.fetch_food,
+                         'steam': self.steam_price,
+                         'decide': self.decide,
+                         'todo': self.todo,
+                         'prio': self.change_priority,
+                         'help': self.help,
+                         'reload': self.reload_poems,
+                         'no': self.no,
+                         'badumtsh': self.badumtsh,
+                         'gaben': self.praise_gaben,
+                         'imdb': self.fetch_imdb,
+                         'posti': self.track_mail
+                         }
         self.url_match_pattern = re.compile(ur'(https?:\/\/|www)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w\.\-\?%&=+]*)\/?', re.UNICODE)
         self.three_dots_pattern = re.compile(ur'[a-z]*\.{1}\.{1}\.{1}', re.UNICODE)
 
