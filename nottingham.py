@@ -31,13 +31,12 @@ class Nottingham(object):
         self.name = self.config.get('Bot', 'name')
 
         self.admins = self.config.get('Users', 'admins').split(',')
-        self.todoadmin = self.config.get('Users', 'todo').split(',')
 
         # Luodaan irc-objekti ja serverimuuttuja irclib-kirjastosta
         self.irc = irclib.IRC()
         self.server = self.irc.server()
 
-        self.commands = {'title': self.fetch_title, 'poem': self.fetch_poem, 'what': self.read_wikipedia, 'food': self.fetch_food, 'steam': self.steam_price, 'decide': self.decide, 'todo': self.todo, 'prio': self.change_priority, 'help': self.help, 'reload': self.reload_poems, 'no': self.no, 'badumtsh': self.badumtsh, 'gaben': self.praise_gaben, 'imdb': self.fetch_imdb, 'posti': self.track_mail }
+        self.commands = {'title': self.fetch_title, 'poem': self.fetch_poem, 'what': self.read_wikipedia, 'food': self.fetch_food, 'steam': self.steam_price, 'decide': self.decide, 'prio': self.change_priority, 'help': self.help, 'reload': self.reload_poems, 'no': self.no, 'badumtsh': self.badumtsh, 'gaben': self.praise_gaben, 'imdb': self.fetch_imdb, 'posti': self.track_mail }
         self.url_match_pattern = re.compile(ur'(https?:\/\/|www)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w\.\-\?%&=+]*)\/?', re.UNICODE)
         self.three_dots_pattern = re.compile(ur'[a-z]*\.{1}\.{1}\.{1}', re.UNICODE)
 
@@ -105,7 +104,7 @@ class Nottingham(object):
         except (UnicodeDecodeError, UnicodeEncodeError) as e:
             # This is for users who have other than utf-8 and for them regex matching fails for every word containing unicode chars.
             return
-        except (TitleException, PoemException, WikiException, RestaurantException, SteamException, DecisionException, TodoException, HelpException, Exception) as e:
+        except (TitleException, PoemException, WikiException, RestaurantException, SteamException, DecisionException, HelpException, Exception) as e:
             self.server.privmsg(target, e)
 
 
@@ -326,41 +325,6 @@ class Nottingham(object):
         except:
             raise DecisionException('Uh, couldn\'t decide')
 
-    def todo(self, name, user, arguments, target):
-        ''' Given a TODO-note, save it to database '''
-        try:
-            if user in self.todoadmin and len(arguments) > 1:
-                connection = sql.connect('todo.db')
-                cursor = connection.cursor()
-                dt = datetime.datetime.now()
-                date = '%s-%s-%s %s:%s:%s' % (dt.year, dt.month, dt.day, int(dt.hour)+1, dt.minute, dt.second)
-                cursor.execute('INSERT INTO todo (thing, date, priority) VALUES (?, ?, 4)', (" ".join(arguments).encode('utf-8'),date))
-                connection.commit()
-                cursor.execute('SELECT max(oid) FROM todo')
-                oid = cursor.fetchone()[0]
-                return 'todo #%s logged' % oid, None
-            else:
-                return 'http://hamatti.org/todo/', None
-        except:
-            raise TodoException('Database says no. Fuck those databases')
-
-    def change_priority(self, name, user, arguments, target):
-        ''' Given a priority and optional TODO-item id, change the priority in database '''
-        try:
-            if user in self.todoadmin:
-                if len(arguments) > 0:
-                    connection = sql.connect('todo.db')
-                    cursor = connection.cursor()
-                    oid = 0
-                    if len(arguments) == 1:
-                        cursor.execute('SELECT max(oid) FROM todo')
-                        oid = cursor.fetchone()[0]
-                    elif len(arguments) == 2:
-                        oid = arguments[1]
-                    cursor.execute('UPDATE todo SET priority = ? WHERE oid = ?', (arguments[0], oid))
-                    connection.commit()
-        except:
-            raise TodoException('Database says no. Fuck those databases')
 
     def help(self, name, user, arguments, target):
         ''' List all the commands in use '''
